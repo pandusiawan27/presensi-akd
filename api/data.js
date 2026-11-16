@@ -2,7 +2,7 @@
 // Kode akses dibaca dari Environment Variable AKD_KODE.
 const U = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const T = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
-const OK = ["atlet", "pelatih", "sesi", "foto"];
+const OK = ["atlet", "pelatih", "sesi", "lomba", "foto"];
 
 async function redis(cmds) {
   const r = await fetch(U + "/pipeline", {
@@ -41,8 +41,8 @@ module.exports = async (req, res) => {
         return res.status(200).json({ data: v ? JSON.parse(v).data : null });
       }
       if (q.all) {
-        const r = await redis([["HGETALL", "akd:atlet"], ["HGETALL", "akd:pelatih"], ["HGETALL", "akd:sesi"]]);
-        return res.status(200).json({ atlet: pairs(r[0].result), pelatih: pairs(r[1].result), sesi: pairs(r[2].result) });
+        const r = await redis([["HGETALL", "akd:atlet"], ["HGETALL", "akd:pelatih"], ["HGETALL", "akd:sesi"], ["HGETALL", "akd:lomba"]]);
+        return res.status(200).json({ atlet: pairs(r[0].result), pelatih: pairs(r[1].result), sesi: pairs(r[2].result), lomba: pairs(r[3].result) });
       }
       return res.status(400).json({ error: "Permintaan tidak dikenal" });
     }
