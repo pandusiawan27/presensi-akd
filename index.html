@@ -383,12 +383,69 @@ var blob=await new Promise(function(r){cv.toBlob(r,"image/jpeg",.92)});
 if(!blob){toast("Gagal membuat gambar.");return}
 var fn="Presensi-Latihan-"+s.tgl+".jpg";
 if(dl){try{await dl.save({filename:fn,data:blob});toast("Gambar disimpan.");return}catch(e){if(e&&e.code==="declined")return}}
-showImg(cv.toDataURL("image/jpeg",.92))}
+saveBlob(blob,fn)}
 
 function dur(s){var a=(s.jm||"").split(":"),b=(s.js||"").split(":"),d=(+b[0]*60+ +b[1])-(+a[0]*60+ +a[1]);return d>0?d:0}
 function fmtJam(m){var h=Math.floor(m/60),n=m%60;return(h?h+" jam":"")+(h&&n?" ":"")+(n?n+" mnt":"")||"-"}
 function rekapPelatih(ss){var m={};ss.forEach(function(s){var o=m[s.pelatih]||(m[s.pelatih]={nama:s.pelatih,n:0,mnt:0,tg:[]});o.n++;o.mnt+=dur(s);o.tg.push(+s.tgl.slice(8,10))});
 return Object.keys(m).map(function(k){m[k].tg.sort(function(a,b){return a-b});return m[k]}).sort(function(a,b){return b.n-a.n||a.nama.localeCompare(b.nama)})}
+function saveBlob(blob,name){var u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},4000);toast("Berkas diunduh. Cek folder Unduhan.")}
+function avgHadir(d){var t=0,h=0;d.rows.forEach(function(o){t+=o.n;h+=o.Hadir});return t?Math.round(h/t*100):0}
+function paintRekap(ctx,m,d,W,draw){
+var P=56,CW=W-2*P,y=0,lg=$("logo");
+function T(t,x,yy,f,c,al){if(!draw)return;ctx.font=f;ctx.fillStyle=c;ctx.textAlign=al||"left";ctx.fillText(t,x,yy)}
+function H(t){T(t,P,y,"400 38px "+FC,"#E3202B");y+=14;if(draw){ctx.fillStyle="#2B2626";ctx.fillRect(P,y,CW,4)}y+=44}
+if(draw){ctx.fillStyle="#FFF1A8";ctx.fillRect(0,0,W,ctx.canvas.height);ctx.fillStyle="#E3202B";ctx.fillRect(0,0,W,200);ctx.fillStyle="#2B2626";ctx.fillRect(0,200,W,8);
+if(lg&&lg.naturalWidth){var lh=176;ctx.drawImage(lg,P,12,lh*lg.naturalWidth/lg.naturalHeight,lh)}
+ctx.font="400 52px "+FC;ctx.lineJoin="round";ctx.lineWidth=10;ctx.strokeStyle="#2B2626";ctx.textAlign="left";ctx.strokeText("Presensi Latihan Karateka",P+150,92);ctx.fillStyle="#FFD500";ctx.fillText("Presensi Latihan Karateka",P+150,92)}
+T("Arjuna Karate Dojo",P+150,150,"400 44px "+FC,"#FFFFFF");
+y=290;
+T("Rekap Bulanan "+namaBulan(m),P,y,"700 48px "+FC,"#2B2626");y+=46;
+T(d.ss.length+" sesi latihan  |  Rata-rata kehadiran "+avgHadir(d)+"%",P,y,"500 30px "+FN,"#5B6577");y+=70;
+H("Rekap atlet");
+var cw=84,x0=W-P-5*cw,cx=function(i){return x0+cw*(i+.5)},cols=["H","I","S","TK","%"];
+cols.forEach(function(c,i){T(c,cx(i),y,"700 26px "+FN,"#5B6577","center")});
+y+=14;if(draw){ctx.fillStyle="#2B2626";ctx.fillRect(P,y,CW,2)}y+=40;
+d.rows.forEach(function(o,r){
+if(draw&&r%2===0){ctx.fillStyle="rgba(255,255,255,.6)";ctx.fillRect(P-10,y-32,CW+20,46)}
+T(o.nama,P,y,"600 30px "+FN,"#2B2626");
+[[o.Hadir,COL.Hadir],[o.Ijin,COL.Ijin],[o.Sakit,COL.Sakit],[o.Keterangan,COL.Keterangan]].forEach(function(v,i){T(String(v[0]),cx(i),y,"700 30px "+FN,v[0]?v[1]:"#9A9A9A","center")});
+T(pct(o)+"%",cx(4),y,"700 30px "+FN,"#2B2626","center");y+=46});
+y+=8;T("H = Hadir, I = Ijin, S = Sakit, TK = Tanpa Keterangan",P,y,"500 24px "+FN,"#5B6577");y+=30;
+y+=24;H("Rekap pelatih");
+rekapPelatih(d.ss).forEach(function(o){
+T(o.nama,P,y,"600 30px "+FN,"#2B2626");T(o.n+" sesi ("+fmtJam(o.mnt)+")",W-P,y,"700 30px "+FN,"#2B2626","right");y+=12;
+ctx.font="400 26px "+FN;wrapT(ctx,"Tanggal "+o.tg.join(", "),CW-40).forEach(function(l){y+=34;T(l,P+20,y,"400 26px "+FN,"#5B6577")});
+y+=44});
+return y+P}
+async function exportRekapJpg(m){
+var d=dataRekap(m);if(!d.ss.length){toast("Belum ada sesi latihan pada bulan ini.");return}
+try{await Promise.all(['400 40px "Lilita One"','600 30px "Nunito"','700 30px "Nunito"'].map(function(f){return document.fonts.load(f)}))}catch(e){}
+try{await $("logo").decode()}catch(e){}
+var W=1080,cv=document.createElement("canvas");cv.width=W;cv.height=100;var ctx=cv.getContext("2d");
+var h=paintRekap(ctx,m,d,W,false);cv.height=Math.ceil(h);ctx=cv.getContext("2d");paintRekap(ctx,m,d,W,true);
+var blob=await new Promise(function(r){cv.toBlob(r,"image/jpeg",.92)});
+if(!blob){toast("Gagal membuat gambar.");return}
+saveBlob(blob,"Rekap-Presensi-AKD-"+m+".jpg")}
+function loadXlsx(){return new Promise(function(res,rej){if(window.XLSX)return res();var e=document.createElement("script");e.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";e.onload=res;e.onerror=rej;document.head.appendChild(e)})}
+async function exportXlsx(m){
+var d=dataRekap(m);if(!d.ss.length){toast("Belum ada sesi latihan pada bulan ini.");return}
+try{await loadXlsx()}catch(e){toast("Gagal memuat pustaka Excel. Periksa koneksi internet.");return}
+var wb=XLSX.utils.book_new(),ss=d.ss.slice().sort(function(a,b){return a.tgl<b.tgl?-1:a.tgl>b.tgl?1:0});
+function sh(name,rows,w){var ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=w.map(function(x){return{wch:x}});XLSX.utils.book_append_sheet(wb,ws,name)}
+var a=[["Atlet","Hadir","Ijin","Sakit","Tanpa Keterangan","Jumlah sesi dicatat","% Hadir"]];
+d.rows.forEach(function(o){a.push([o.nama,o.Hadir,o.Ijin,o.Sakit,o.Keterangan,o.n,pct(o)])});
+sh("Rekap Atlet",a,[28,9,9,9,18,20,10]);
+var b=[["Pelatih","Jumlah sesi","Total jam","Tanggal"]];
+rekapPelatih(d.ss).forEach(function(o){b.push([o.nama,o.n,fmtJam(o.mnt),o.tg.join(", ")])});
+sh("Rekap Pelatih",b,[28,14,16,40]);
+var c=[["Tanggal","Jam","Pelatih","Materi latihan","Evaluasi","Hadir","Ijin","Sakit","Tanpa Keterangan"]];
+ss.forEach(function(s){var h=hitung(s);c.push([s.tgl,jam(s.jm)+" - "+jam(s.js),s.pelatih,s.materi||"",s.evaluasi||"",h.Hadir,h.Ijin,h.Sakit,h.Keterangan])});
+sh("Sesi Latihan",c,[12,14,22,40,40,8,8,8,18]);
+var e=[["Tanggal","Atlet","Status","Catatan"]];
+ss.forEach(function(s){s.hadir.forEach(function(h){e.push([s.tgl,h.nama,lbl(h.s),h.k||""])})});
+sh("Catatan Atlet",e,[12,28,18,60]);
+try{XLSX.writeFile(wb,"Rekap-Presensi-AKD-"+m+".xlsx");toast("Berkas diunduh. Cek folder Unduhan.")}catch(err){toast("Gagal membuat berkas Excel.")}}
 var rb=null;
 function bulanIni(){return today().slice(0,7)}
 function namaBulan(m){var p=m.split("-");return new Date(+p[0],+p[1]-1,1).toLocaleDateString("id-ID",{month:"long",year:"numeric"})}
@@ -404,10 +461,10 @@ if(!d.ss.length){h+='<p class="empty">Belum ada sesi latihan pada '+namaBulan(m)
 else{d.rows.forEach(function(o){tot+=o.n;hd+=o.Hadir});
 h+='<p class="mt">'+d.ss.length+' sesi latihan pada '+namaBulan(m)+'. Rata-rata kehadiran '+Math.round(hd/tot*100)+'%.</p><div class="tw"><table class="rk"><thead><tr><th>Atlet</th><th>H</th><th>I</th><th>S</th><th>K</th><th>% hadir</th></tr></thead><tbody>'+
 d.rows.map(function(o){return '<tr><td>'+esc(o.nama)+'</td><td>'+o.Hadir+'</td><td>'+o.Ijin+'</td><td>'+o.Sakit+'</td><td>'+o.Keterangan+'</td><td>'+pct(o)+'%</td></tr>'}).join("")+
-'</tbody></table></div><p class="mt">H = Hadir, I = Ijin, S = Sakit, K = Tanpa Keterangan</p><h3 style="font-size:22px;color:var(--pri);margin:22px 0 8px">Rekap pelatih</h3><div class="tw"><table class="rk rp"><thead><tr><th>Pelatih</th><th>Sesi</th><th>Total jam</th><th style="text-align:left">Tanggal</th></tr></thead><tbody>'+rekapPelatih(d.ss).map(function(o){return '<tr><td>'+esc(o.nama)+'</td><td>'+o.n+'</td><td>'+fmtJam(o.mnt)+'</td><td>'+o.tg.join(", ")+'</td></tr>'}).join("")+'</tbody></table></div><div class="bar" style="margin-top:10px"><button class="btn sm" id="salinR" type="button">Salin rekap bulanan</button></div><textarea class="out" id="outR" hidden readonly></textarea></section>'}
+'</tbody></table></div><p class="mt">H = Hadir, I = Ijin, S = Sakit, K = Tanpa Keterangan</p><h3 style="font-size:22px;color:var(--pri);margin:22px 0 8px">Rekap pelatih</h3><div class="tw"><table class="rk rp"><thead><tr><th>Pelatih</th><th>Sesi</th><th>Total jam</th><th style="text-align:left">Tanggal</th></tr></thead><tbody>'+rekapPelatih(d.ss).map(function(o){return '<tr><td>'+esc(o.nama)+'</td><td>'+o.n+'</td><td>'+fmtJam(o.mnt)+'</td><td>'+o.tg.join(", ")+'</td></tr>'}).join("")+'</tbody></table></div><div class="bar" style="margin-top:10px"><button class="btn sm" id="salinR" type="button">Salin rekap bulanan</button><button class="btn ghost sm" id="jpgR" type="button">Simpan JPG</button><button class="btn ghost sm" id="xlsR" type="button">Unduh Excel</button></div><textarea class="out" id="outR" hidden readonly></textarea></section>'}
 $("v-rekap").innerHTML=h}
 $("v-rekap").addEventListener("change",function(e){if(e.target.id==="bln"&&e.target.value){rb=e.target.value;renderRekap()}});
-$("v-rekap").addEventListener("click",function(e){if(e.target.id!=="salinR")return;var txt=rekapBulan(rb||bulanIni()),ta=$("outR");ta.value=txt;
+$("v-rekap").addEventListener("click",function(e){if(e.target.id==="jpgR"){exportRekapJpg(rb||bulanIni());return}if(e.target.id==="xlsR"){exportXlsx(rb||bulanIni());return}if(e.target.id!=="salinR")return;var txt=rekapBulan(rb||bulanIni()),ta=$("outR");ta.value=txt;
 (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(txt):Promise.reject()).then(function(){toast("Rekap disalin.")},function(){ta.hidden=false;ta.select();toast("Salin teks di bawah secara manual.")})});
 
 $("tgl").value=today();$("hari").textContent=tglPanjang(today());db.pelatih=readPref();loc=readLoc();if(!db.pelatih&&loc)db.pelatih=loc.pelatih||"";renderPelatihSel();renderRoster();initDb();
