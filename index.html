@@ -110,6 +110,8 @@ input[type=text],input[type=date],input[type=time],input[type=month],select,text
 @media(max-width:520px){.seg{grid-template-columns:1fr 1fr}}
 .note{min-height:64px;font-size:15px}
 .lr{display:flex;gap:8px;align-items:center;margin-bottom:8px}.lr select{flex:1;margin:0}
+.fr{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}.thumb{width:64px;height:64px;object-fit:cover;border-radius:8px;border:2.5px solid var(--edge)}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:14px}.gal img{width:100%;border-radius:8px;border:2.5px solid var(--edge);display:block}.gal figcaption{font-size:13px;font-weight:700;margin-top:4px}.gal img[hidden]+figcaption{display:none}
 @media(max-width:520px){nav button{font-size:12px}}
 input[type=password]{display:block;width:100%;margin:0;padding:10px 12px;border:2.5px solid var(--edge);border-radius:10px;font:600 16px "Nunito",system-ui,sans-serif;color:var(--ink);background:var(--bg)}
 .stat{font-size:14px;font-weight:800;padding:8px 12px;border:2.5px solid var(--edge);border-radius:10px;margin:-8px 0 18px;background:var(--sf);color:var(--ink)}
@@ -464,18 +466,21 @@ var e=[["Tanggal","Atlet","Status","Catatan"]];
 ss.forEach(function(s){s.hadir.forEach(function(h){e.push([s.tgl,h.nama,lbl(h.s),h.k||""])})});
 sh("Catatan Atlet",e,[12,28,18,60]);
 try{XLSX.writeFile(wb,"Rekap-Presensi-AKD-"+m+".xlsx");toast("Berkas diunduh. Cek folder Unduhan.")}catch(err){toast("Gagal membuat berkas Excel.")}}
-var lPes=[],lEdit=null;
+var lPes=[],lEdit=null,lDelF=[];
+function compressImg(file){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){var im=new Image();im.onload=function(){var s=Math.min(1,900/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext("2d").drawImage(im,0,0,c.width,c.height);var q=.65,u=c.toDataURL("image/jpeg",q);while(u.length>170000&&q>.3){q-=.1;u=c.toDataURL("image/jpeg",q)}res(u)};im.onerror=rej;im.src=r.result};r.onerror=rej;r.readAsDataURL(file)})}
+function lFile(i,f){if(!f)return;compressImg(f).then(function(u){var r=lPes[i];if(!r)return;r.foto=u;r.dirty=true;r.rm=false;renderLRows()},function(){toast("Foto tidak bisa dibaca.")})}
+function gal(pes){var h=pes.filter(function(p){return p.fid||p.foto}).map(function(p){return '<figure style="margin:0"><img '+(p.foto?'src="'+p.foto+'"':'data-fid="'+p.fid+'"'+(fotoCache[p.fid]?' src="'+fotoCache[p.fid]+'"':' hidden'))+' alt="Foto '+esc(p.atlet)+'"><figcaption>'+esc(p.atlet)+(p.hasil?' &middot; '+esc(p.hasil):'')+'</figcaption></figure>'}).join("");return h?'<div class="gal">'+h+'</div>':''}
 function medals(l){var m=[0,0,0,0];(l.peserta||[]).forEach(function(p){var h=(p.hasil||"").toLowerCase();if(/juara\s*1\b|emas/.test(h))m[1]++;else if(/juara\s*2\b|perak/.test(h))m[2]++;else if(/juara\s*3\b|perunggu/.test(h))m[3]++});return m}
 function lombaTeks(l){var L=["*Hasil Lomba*",l.nama];if(l.tgl)L.push(tglPanjang(l.tgl));L.push("");
 l.peserta.forEach(function(p,i){L.push((i+1)+". "+p.atlet+(p.kat?" - "+p.kat:"")+(p.hasil?" - "+p.hasil:""))});
 var m=medals(l);if(m[1]+m[2]+m[3])L.push("","Juara 1: "+m[1]+", Juara 2: "+m[2]+", Juara 3: "+m[3]);return L.join("\n")}
-function lReset(){lEdit=null;lPes=[{atlet:"",kat:"",hasil:""}];$("lNama").value="";$("lTgl").value=today();$("lJudul").textContent="Catat lomba";$("lSimpan").textContent="Simpan lomba";$("lBatal").hidden=true;renderLRows()}
+function lReset(){lEdit=null;lDelF=[];lPes=[{atlet:"",kat:"",hasil:""}];$("lNama").value="";$("lTgl").value=today();$("lJudul").textContent="Catat lomba";$("lSimpan").textContent="Simpan lomba";$("lBatal").hidden=true;renderLRows()}
 function renderLRows(){
 var ops=db.atlet.map(function(a){return a.nama});
 $("lRows").innerHTML=lPes.map(function(r,i){var o=ops.slice();if(r.atlet&&o.indexOf(r.atlet)<0)o.push(r.atlet);
 return '<div class="ath"><div class="lr"><select data-li="'+i+'" data-f="atlet" aria-label="Nama atlet"><option value="">Pilih atlet</option>'+o.map(function(n){return '<option'+(n===r.atlet?' selected':'')+'>'+esc(n)+'</option>'}).join("")+'</select><button class="btn bad sm" data-lrm="'+i+'" type="button">Hapus</button></div>'+
 '<input type="text" list="dlKat" data-li="'+i+'" data-f="kat" placeholder="Kategori (mis. Kata Perorangan Kadet Putra)" value="'+esc(r.kat)+'" aria-label="Kategori" style="margin-bottom:8px">'+
-'<input type="text" list="dlHasil" data-li="'+i+'" data-f="hasil" placeholder="Hasil (mis. Juara 1)" value="'+esc(r.hasil)+'" aria-label="Hasil"></div>'}).join("")||'<p class="empty">Belum ada peserta. Tekan Tambah peserta.</p>'}
+'<input type="text" list="dlHasil" data-li="'+i+'" data-f="hasil" placeholder="Hasil (mis. Juara 1)" value="'+esc(r.hasil)+'" aria-label="Hasil"><div class="fr"><label class="btn ghost sm">'+(r.foto?"Ganti foto":"Foto atlet")+'<input type="file" accept="image/*" data-li="'+i+'" data-f="fotofile" hidden></label>'+(r.foto?'<img class="thumb" src="'+r.foto+'" alt="Foto '+esc(r.atlet)+'"><button class="btn bad sm" data-lfrm="'+i+'" type="button">Hapus foto</button>':'')+'</div></div>'}).join("")||'<p class="empty">Belum ada peserta. Tekan Tambah peserta.</p>'}
 function renderLomba(){
 var ks={};db.lomba.forEach(function(l){(l.peserta||[]).forEach(function(p){if(p.kat)ks[p.kat]=1})});
 $("dlKat").innerHTML=Object.keys(ks).map(function(k){return '<option value="'+esc(k)+'">'}).join("");
@@ -486,27 +491,39 @@ el.innerHTML=db.lomba.map(function(l){var m=medals(l),pes=l.peserta||[];
 return '<details data-id="'+l.id+'"'+(op[l.id]?" open":"")+'><summary><div class="dt">'+esc(l.nama)+'</div><div class="mt">'+(l.tgl?esc(tglPanjang(l.tgl))+' &middot; ':'')+pes.length+' peserta</div><div class="chips">'+
 [[1,"c-Sakit"],[2,"c-Keterangan"],[3,"c-Ijin"]].map(function(x){return m[x[0]]?'<span class="chip '+x[1]+'">Juara '+x[0]+': '+m[x[0]]+'</span>':''}).join("")+'</div></summary><div class="det"><table>'+
 pes.map(function(p){return '<tr><td>'+esc(p.atlet)+(p.kat?'<div class="mt">'+esc(p.kat)+'</div>':'')+'</td><td>'+(esc(p.hasil)||'-')+'</td></tr>'}).join("")+
-'</table><div class="bar" style="margin-top:14px"><button class="btn sm" data-lcopy="'+l.id+'" type="button">Salin hasil</button><button class="btn ghost sm" data-ledit="'+l.id+'" type="button">Edit</button><button class="btn bad sm" data-ldel="'+l.id+'" type="button">Hapus</button></div><textarea class="out" hidden readonly></textarea></div></details>'}).join("")}
-$("lRows").addEventListener("input",function(e){var i=e.target.dataset.li,f=e.target.dataset.f;if(i!=null&&f)lPes[+i][f]=e.target.value});
-$("lRows").addEventListener("change",function(e){var i=e.target.dataset.li,f=e.target.dataset.f;if(i!=null&&f)lPes[+i][f]=e.target.value});
-$("lRows").addEventListener("click",function(e){var i=e.target.dataset.lrm;if(i==null)return;lPes.splice(+i,1);renderLRows()});
+'</table>'+gal(pes)+'<div class="bar" style="margin-top:14px"><button class="btn sm" data-lcopy="'+l.id+'" type="button">Salin hasil</button><button class="btn ghost sm" data-ledit="'+l.id+'" type="button">Edit</button><button class="btn bad sm" data-ldel="'+l.id+'" type="button">Hapus</button></div><textarea class="out" hidden readonly></textarea></div></details>'}).join("");el.querySelectorAll("details[open] img[data-fid]").forEach(function(i){ensureFoto(i.dataset.fid)})}
+$("lList").addEventListener("toggle",function(e){if(e.target.open)e.target.querySelectorAll("img[data-fid]").forEach(function(i){ensureFoto(i.dataset.fid)})},true);
+$("lRows").addEventListener("input",function(e){var i=e.target.dataset.li,f=e.target.dataset.f;if(i!=null&&f&&f!=="fotofile")lPes[+i][f]=e.target.value});
+$("lRows").addEventListener("change",function(e){var i=e.target.dataset.li,f=e.target.dataset.f;if(i==null||!f)return;if(f==="fotofile"){lFile(+i,e.target.files[0]);return}lPes[+i][f]=e.target.value});
+$("lRows").addEventListener("click",function(e){var t=e.target;
+if(t.dataset.lrm!=null){var r=lPes[+t.dataset.lrm];if(r&&r.fid)lDelF.push(r.fid);lPes.splice(+t.dataset.lrm,1);renderLRows();return}
+if(t.dataset.lfrm!=null){var q=lPes[+t.dataset.lfrm];q.foto="";q.rm=true;q.dirty=false;renderLRows()}});
 $("lAdd").onclick=function(){lPes.push({atlet:"",kat:"",hasil:""});renderLRows()};
 $("lBatal").onclick=lReset;
 $("lSimpan").onclick=function(){
 var n=$("lNama").value.trim();if(!n){toast("Isi nama lomba dulu.");$("lNama").focus();return}
-var pes=lPes.filter(function(r){return r.atlet}).map(function(r){return{atlet:r.atlet,kat:(r.kat||"").trim(),hasil:(r.hasil||"").trim()}});
+var lid=lEdit||uid(),jobs=[],pes=[];
+lPes.filter(function(r){return r.atlet}).forEach(function(r){
+var o={atlet:r.atlet,kat:(r.kat||"").trim(),hasil:(r.hasil||"").trim()};
+if(remote){var fid=r.fid||"";if(r.rm&&fid){lDelF.push(fid);fid=""}
+if(r.dirty&&r.foto){fid=fid||(lid+"p"+Math.random().toString(36).slice(2,8));jobs.push([fid,r.foto])}
+if(fid)o.fid=fid}else if(r.foto)o.foto=r.foto;
+pes.push(o)});
 if(!pes.length){toast("Pilih minimal satu atlet peserta.");return}
 var old=lEdit?db.lomba.filter(function(x){return x.id===lEdit})[0]:null,edit=!!lEdit,btn=$("lSimpan");
-var rec={id:lEdit||uid(),nama:n,tgl:$("lTgl").value,peserta:pes,ts:(old&&old.ts)||Date.now()};
+var rec={id:lid,nama:n,tgl:$("lTgl").value,peserta:pes,ts:(old&&old.ts)||Date.now()};
 btn.disabled=true;
-put("lomba",rec).then(function(){toast(edit?"Lomba diperbarui.":"Lomba tersimpan.");lReset()},fail).then(function(){btn.disabled=false})};
+Promise.all(jobs.map(function(j){return remote.doc("foto/"+j[0]).set({data:j[1]}).then(function(){fotoCache[j[0]]=j[1]})}))
+.then(function(){return put("lomba",rec)})
+.then(function(){return Promise.all(lDelF.map(function(id){return rm("foto",id).catch(function(){})}))})
+.then(function(){toast(edit?"Lomba diperbarui.":"Lomba tersimpan.");lReset()},fail).then(function(){btn.disabled=false})};
 $("lList").addEventListener("click",function(e){
 var t=e.target,id=t.dataset.lcopy||t.dataset.ledit||t.dataset.ldel;if(!id)return;
 var l=db.lomba.filter(function(x){return x.id===id})[0];if(!l)return;
 if(t.dataset.ldel){if(t.dataset.sure!=="1"){t.dataset.sure="1";t.textContent="Yakin hapus?";return}
-rm("lomba",id).then(function(){toast("Lomba dihapus.")},fail);return}
-if(t.dataset.ledit){lEdit=id;$("lNama").value=l.nama;$("lTgl").value=l.tgl||today();lPes=(l.peserta||[]).map(function(p){return{atlet:p.atlet,kat:p.kat||"",hasil:p.hasil||""}});
-$("lJudul").textContent="Edit lomba";$("lSimpan").textContent="Perbarui lomba";$("lBatal").hidden=false;renderLRows();window.scrollTo({top:0,behavior:"smooth"});return}
+(l.peserta||[]).forEach(function(p){if(p.fid)rm("foto",p.fid).catch(function(){})});rm("lomba",id).then(function(){toast("Lomba dihapus.")},fail);return}
+if(t.dataset.ledit){lEdit=id;$("lNama").value=l.nama;$("lTgl").value=l.tgl||today();lPes=(l.peserta||[]).map(function(p){return{atlet:p.atlet,kat:p.kat||"",hasil:p.hasil||"",fid:p.fid||"",foto:p.foto||""}});
+$("lJudul").textContent="Edit lomba";$("lSimpan").textContent="Perbarui lomba";$("lBatal").hidden=false;lDelF=[];renderLRows();lPes.forEach(function(r){if(r.fid)getFoto(r.fid).then(function(u){if(u&&lEdit===id&&!r.foto&&!r.rm){r.foto=u;renderLRows()}})});window.scrollTo({top:0,behavior:"smooth"});return}
 var txt=lombaTeks(l),ta=t.closest(".det").querySelector("textarea");ta.value=txt;
 (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(txt):Promise.reject()).then(function(){toast("Hasil lomba disalin.")},function(){ta.hidden=false;ta.select();toast("Salin teks di bawah secara manual.")})});
 lReset();
