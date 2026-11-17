@@ -502,7 +502,7 @@ el.innerHTML=db.lomba.map(function(l){var m=medals(l),pes=l.peserta||[];
 return '<details data-id="'+l.id+'"'+(op[l.id]?" open":"")+'><summary><div class="dt">'+esc(l.nama)+'</div><div class="mt">'+(l.tgl?esc(tglPanjang(l.tgl))+' &middot; ':'')+pes.length+' peserta</div><div class="chips">'+
 [[1,"c-Sakit"],[2,"c-Keterangan"],[3,"c-Ijin"]].map(function(x){return m[x[0]]?'<span class="chip '+x[1]+'">Juara '+x[0]+': '+m[x[0]]+'</span>':''}).join("")+'</div></summary><div class="det"><table>'+
 pes.map(function(p){return '<tr><td>'+esc(p.atlet)+(p.kat?'<div class="mt">'+esc(p.kat)+'</div>':'')+'</td><td>'+(esc(p.hasil)||'-')+'</td></tr>'}).join("")+
-'</table>'+gal(pes)+'<div class="bar" style="margin-top:14px"><button class="btn sm" data-lcopy="'+l.id+'" type="button">Salin hasil</button><button class="btn ghost sm" data-ledit="'+l.id+'" type="button">Edit</button><button class="btn bad sm" data-ldel="'+l.id+'" type="button">Hapus</button></div><textarea class="out" hidden readonly></textarea></div></details>'}).join("");el.querySelectorAll("details[open] img[data-fid]").forEach(function(i){ensureFoto(i.dataset.fid)})}
+'</table>'+gal(pes)+'<div class="bar" style="margin-top:14px"><button class="btn sm" data-lcopy="'+l.id+'" type="button">Salin hasil</button><button class="btn ghost sm" data-ljpg="'+l.id+'" type="button">Simpan JPG</button><button class="btn ghost sm" data-ledit="'+l.id+'" type="button">Edit</button><button class="btn bad sm" data-ldel="'+l.id+'" type="button">Hapus</button></div><textarea class="out" hidden readonly></textarea></div></details>'}).join("");el.querySelectorAll("details[open] img[data-fid]").forEach(function(i){ensureFoto(i.dataset.fid)})}
 $("lList").addEventListener("toggle",function(e){if(e.target.open)e.target.querySelectorAll("img[data-fid]").forEach(function(i){ensureFoto(i.dataset.fid)})},true);
 $("lRows").addEventListener("input",function(e){var i=e.target.dataset.li,f=e.target.dataset.f;if(i!=null&&f&&f!=="fotofile")lPes[+i][f]=e.target.value});
 $("lRows").addEventListener("change",function(e){var i=e.target.dataset.li,f=e.target.dataset.f;if(i==null||!f)return;if(f==="fotofile"){lFile(+i,e.target.files[0]);return}lPes[+i][f]=e.target.value});
@@ -529,8 +529,9 @@ Promise.all(jobs.map(function(j){return remote.doc("foto/"+j[0]).set({data:j[1]}
 .then(function(){return Promise.all(lDelF.map(function(id){return rm("foto",id).catch(function(){})}))})
 .then(function(){toast(edit?"Lomba diperbarui.":"Lomba tersimpan.");lReset()},fail).then(function(){btn.disabled=false})};
 $("lList").addEventListener("click",function(e){
-var t=e.target,id=t.dataset.lcopy||t.dataset.ledit||t.dataset.ldel;if(!id)return;
+var t=e.target,id=t.dataset.lcopy||t.dataset.ledit||t.dataset.ldel||t.dataset.ljpg;if(!id)return;
 var l=db.lomba.filter(function(x){return x.id===id})[0];if(!l)return;
+if(t.dataset.ljpg){exportLombaJpg(l);return}
 if(t.dataset.ldel){if(t.dataset.sure!=="1"){t.dataset.sure="1";t.textContent="Yakin hapus?";return}
 (l.peserta||[]).forEach(function(p){if(p.fid)rm("foto",p.fid).catch(function(){})});rm("lomba",id).then(function(){toast("Lomba dihapus.")},fail);return}
 if(t.dataset.ledit){lEdit=id;$("lNama").value=l.nama;$("lTgl").value=l.tgl||today();lPes=(l.peserta||[]).map(function(p){return{atlet:p.atlet,kat:p.kat||"",hasil:p.hasil||"",fid:p.fid||"",foto:p.foto||""}});
@@ -579,6 +580,47 @@ else{$("prev").hidden=true;$("fotoHapus").hidden=true;
 if(s.hasFoto)getFoto(s.id).then(function(u){if(u&&sEdit===s.id&&!fotoDirty&&!fotoDel){foto=u;$("prev").src=u;$("prev").hidden=false;$("fotoHapus").hidden=false}})}
 $("eBarT").textContent="Sedang mengedit sesi "+tglPanjang(s.tgl)+".";$("eBar").hidden=false;$("simpan").textContent="Simpan perubahan";
 tab("catat");window.scrollTo({top:0,behavior:"smooth"})}
+function hasilColor(h){h=(h||"").toLowerCase();return/juara\s*1\b|emas/.test(h)?"#B07800":/juara\s*2\b|perak/.test(h)?"#6B7280":/juara\s*3\b|perunggu/.test(h)?"#2B5FA8":"#2B2626"}
+function fitT(c,t,w){if(c.measureText(t).width<=w)return t;while(t.length>1&&c.measureText(t+"\u2026").width>w)t=t.slice(0,-1);return t+"\u2026"}
+function paintLomba(ctx,l,imgs,W,draw){
+var P=56,CW=W-2*P,y=0,lg=$("logo"),pes=l.peserta||[],m=medals(l);
+function T(t,x,yy,f,c,al){if(!draw)return;ctx.font=f;ctx.fillStyle=c;ctx.textAlign=al||"left";ctx.fillText(t,x,yy)}
+function H(t){T(t,P,y,"400 38px "+FC,"#E3202B");y+=14;if(draw){ctx.fillStyle="#2B2626";ctx.fillRect(P,y,CW,4)}y+=44}
+if(draw){ctx.fillStyle="#FFF1A8";ctx.fillRect(0,0,W,ctx.canvas.height);ctx.fillStyle="#E3202B";ctx.fillRect(0,0,W,200);ctx.fillStyle="#2B2626";ctx.fillRect(0,200,W,8);
+if(lg&&lg.naturalWidth){var lh=176;ctx.drawImage(lg,P,12,lh*lg.naturalWidth/lg.naturalHeight,lh)}
+ctx.font="400 52px "+FC;ctx.lineJoin="round";ctx.lineWidth=10;ctx.strokeStyle="#2B2626";ctx.textAlign="left";ctx.strokeText("Presensi Latihan Karateka",P+150,92);ctx.fillStyle="#FFD500";ctx.fillText("Presensi Latihan Karateka",P+150,92)}
+T("Arjuna Karate Dojo",P+150,150,"400 44px "+FC,"#FFFFFF");
+y=290;
+ctx.font="700 48px "+FC;
+wrapT(ctx,l.nama,CW).forEach(function(ln){T(ln,P,y,"700 48px "+FC,"#2B2626");y+=56});
+y-=14;T((l.tgl?tglPanjang(l.tgl)+"  |  ":"")+pes.length+" peserta",P,y,"500 30px "+FN,"#5B6577");y+=56;
+var x=P,any=m[1]+m[2]+m[3]>0;
+[[1,COL.Sakit],[2,COL.Keterangan],[3,COL.Ijin]].forEach(function(c){if(!m[c[0]])return;var lb="Juara "+c[0]+": "+m[c[0]];ctx.font="600 28px "+FN;var w=ctx.measureText(lb).width+36;if(x+w>W-P){x=P;y+=56}
+if(draw){ctx.fillStyle=c[1];rr(ctx,x,y,w,46,23);ctx.fill()}T(lb,x+18,y+32,"600 28px "+FN,"#FFFFFF");x+=w+12});
+y+=any?96:10;
+H("Hasil peserta");
+pes.forEach(function(q){T(q.atlet,P,y,"600 30px "+FN,"#2B2626");T(q.hasil||"-",W-P,y,"700 30px "+FN,hasilColor(q.hasil),"right");y+=12;
+if(q.kat){ctx.font="400 26px "+FN;wrapT(ctx,q.kat,CW-40).forEach(function(ln){y+=34;T(ln,P+20,y,"400 26px "+FN,"#5B6577")});y+=10}
+y+=34});
+if(imgs.length){y+=24;H("Dokumentasi");var cell=Math.floor((CW-20)/2);
+imgs.forEach(function(o,i){var col=i%2,x0=P+col*(cell+20);
+if(draw){var im=o.img,sw=Math.min(im.width,im.height),sx=(im.width-sw)/2,sy=(im.height-sw)/2;ctx.save();rr(ctx,x0,y,cell,cell,14);ctx.clip();ctx.drawImage(im,sx,sy,sw,sw,x0,y,cell,cell);ctx.restore();ctx.strokeStyle="#2B2626";ctx.lineWidth=4;rr(ctx,x0,y,cell,cell,14);ctx.stroke()}
+ctx.font="700 26px "+FN;T(fitT(ctx,o.p.atlet+(o.p.hasil?" - "+o.p.hasil:""),cell),x0,y+cell+34,"700 26px "+FN,"#2B2626");
+if(col===1||i===imgs.length-1)y+=cell+64})}
+return y+P}
+async function exportLombaJpg(l){
+toast("Menyiapkan gambar...");
+try{await Promise.all(['400 40px "Lilita One"','600 30px "Nunito"','700 30px "Nunito"'].map(function(f){return document.fonts.load(f)}))}catch(e){}
+try{await $("logo").decode()}catch(e){}
+var imgs=[],pes=l.peserta||[];
+for(var i=0;i<pes.length;i++){var q=pes[i],u=q.foto||(q.fid?await getFoto(q.fid):null);if(!u)continue;
+var im=await new Promise(function(r){var x=new Image();x.onload=function(){r(x)};x.onerror=function(){r(null)};x.src=u});if(im)imgs.push({img:im,p:q})}
+var W=1080,cv=document.createElement("canvas");cv.width=W;cv.height=100;var ctx=cv.getContext("2d");
+var h=paintLomba(ctx,l,imgs,W,false);cv.height=Math.ceil(h);ctx=cv.getContext("2d");paintLomba(ctx,l,imgs,W,true);
+var blob=await new Promise(function(r){cv.toBlob(r,"image/jpeg",.92)});
+if(!blob){toast("Gagal membuat gambar.");return}
+var slug=String(l.nama).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,40)||"lomba";
+saveBlob(blob,"Hasil-Lomba-"+slug+(l.tgl?"-"+l.tgl:"")+".jpg")}
 var rb=null;
 function bulanIni(){return today().slice(0,7)}
 function namaBulan(m){var p=m.split("-");return new Date(+p[0],+p[1]-1,1).toLocaleDateString("id-ID",{month:"long",year:"numeric"})}
