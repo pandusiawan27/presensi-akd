@@ -110,6 +110,7 @@ input[type=text],input[type=date],input[type=time],input[type=month],select,text
 @media(max-width:520px){.seg{grid-template-columns:1fr 1fr}}
 .note{min-height:64px;font-size:15px}
 .lr{display:flex;gap:8px;align-items:center;margin-bottom:8px}.lr select{flex:1;margin:0}
+ul.l li{gap:8px;flex-wrap:wrap}.rn input{margin:0;flex:1;min-width:140px}
 .fr{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}.thumb{width:64px;height:64px;object-fit:cover;border-radius:8px;border:2.5px solid var(--edge)}
 .gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:14px}.gal img{width:100%;border-radius:8px;border:2.5px solid var(--edge);display:block}.gal figcaption{font-size:13px;font-weight:700;margin-top:4px}.gal img[hidden]+figcaption{display:none}
 @media(max-width:520px){nav button{font-size:12px}}
@@ -133,6 +134,7 @@ input[type=password]{display:block;width:100%;margin:0;padding:10px 12px;border:
 </nav>
 
 <div id="v-catat">
+<div id="eBar" class="stat w" role="status" style="margin:0 0 16px" hidden><span id="eBarT"></span> <button class="btn ghost sm" id="eBatal" type="button">Batal edit</button></div>
 <section>
 <h2>Sesi latihan</h2>
 <label class="f">Nama pelatih<select id="pelatih"></select></label>
@@ -152,6 +154,7 @@ input[type=password]{display:block;width:100%;margin:0;padding:10px 12px;border:
 <label class="f">Evaluasi<textarea id="evaluasi" placeholder="Catatan perkembangan atlet dan hal yang perlu diperbaiki"></textarea></label>
 <label class="f">Foto latihan<input type="file" id="foto" accept="image/*"></label>
 <img class="prev" id="prev" alt="Pratinjau foto" hidden>
+<button class="btn bad sm" id="fotoHapus" type="button" style="margin-top:8px" hidden>Hapus foto</button>
 </section>
 <div class="bar"><button class="btn" id="simpan" type="button">Simpan presensi</button><button class="btn ghost" id="reset" type="button">Kosongkan formulir</button></div>
 </div>
@@ -286,7 +289,7 @@ el.innerHTML=db.atlet.map(function(a){
 var c=cur[a.id]||(cur[a.id]={s:"Hadir",k:""});
 return '<div class="ath"><b>'+esc(a.nama)+'</b><div class="seg" role="radiogroup" aria-label="Keterangan '+esc(a.nama)+'">'+
 ST.map(function(s){return '<label class="'+s+'"><input type="radio" name="r'+a.id+'" value="'+s+'" data-id="'+a.id+'"'+(c.s===s?" checked":"")+'><span>'+lbl(s)+'</span></label>'}).join("")+
-'</div>'+'<textarea class="note" rows="2" data-note="'+a.id+'" placeholder="'+PH[c.s]+'" aria-label="Catatan '+esc(a.nama)+'">'+esc(c.k)+'</textarea>'+'</div>'}).join("")}
+'</div>'+'<textarea class="note" rows="2" data-note="'+a.id+'" placeholder="'+(PH[c.s]||PH.Keterangan)+'" aria-label="Catatan '+esc(a.nama)+'">'+esc(c.k)+'</textarea>'+'</div>'}).join("")}
 $("roster").addEventListener("change",function(e){var id=e.target.dataset.id;if(id){cur[id]=cur[id]||{s:"Hadir",k:""};cur[id].s=e.target.value;renderRoster()}});
 $("roster").addEventListener("input",function(e){var id=e.target.dataset.note;if(id)cur[id].k=e.target.value});
 $("semua").onclick=function(){db.atlet.forEach(function(a){cur[a.id]={s:"Hadir",k:""}});renderRoster()};
@@ -299,24 +302,28 @@ var r=new FileReader();
 r.onload=function(){var im=new Image();im.onload=function(){
 var m=900,w=im.width,h=im.height,s=Math.min(1,m/Math.max(w,h)),c=document.createElement("canvas");
 c.width=Math.round(w*s);c.height=Math.round(h*s);c.getContext("2d").drawImage(im,0,0,c.width,c.height);
-var q=.65;foto=c.toDataURL("image/jpeg",q);while(foto.length>170000&&q>.3){q-=.1;foto=c.toDataURL("image/jpeg",q)}$("prev").src=foto;$("prev").hidden=false};
+var q=.65;foto=c.toDataURL("image/jpeg",q);while(foto.length>170000&&q>.3){q-=.1;foto=c.toDataURL("image/jpeg",q)}$("prev").src=foto;$("prev").hidden=false;fotoDirty=true;fotoDel=false;$("fotoHapus").hidden=false};
 im.onerror=function(){toast("Foto tidak bisa dibaca.")};im.src=r.result};
 r.readAsDataURL(f)};
 
-function resetForm(){cur={};foto="";$("materi").value="";$("evaluasi").value="";$("foto").value="";$("prev").hidden=true;$("tgl").value=today();$("hari").textContent=tglPanjang(today());renderRoster()}
+function resetForm(){if(sEdit){$("jm").value="16:00";$("js").value="18:00"}cur={};foto="";sEdit=null;sExtra=[];fotoDirty=false;fotoDel=false;$("eBar").hidden=true;$("simpan").textContent="Simpan presensi";$("fotoHapus").hidden=true;$("materi").value="";$("evaluasi").value="";$("foto").value="";$("prev").hidden=true;$("tgl").value=today();$("hari").textContent=tglPanjang(today());renderRoster()}
 $("reset").onclick=resetForm;
 $("simpan").onclick=function(){
 var p=$("pelatih").value.trim(),t=$("tgl").value;
 if(!p){toast(db.pelatihList.length?"Pilih nama pelatih dulu.":"Tambahkan pelatih di tab Atlet & pelatih.");$("pelatih").focus();return}
 if(!t){toast("Pilih tanggal latihan.");return}
 if(!db.atlet.length){toast("Tambahkan atlet dulu.");return}
-var hadir=db.atlet.map(function(a){var c=cur[a.id]||{s:"Hadir",k:""};return{nama:a.nama,s:c.s,k:c.k}});
-var sid=uid(),rec={id:sid,pelatih:p,tgl:t,jm:$("jm").value,js:$("js").value,materi:$("materi").value.trim(),evaluasi:$("evaluasi").value.trim(),hadir:hadir,ts:Date.now()};
-db.pelatih=p;save();
+var hadir=db.atlet.map(function(a){var c=cur[a.id]||{s:"Hadir",k:""};return{nama:a.nama,s:c.s,k:c.k}}).filter(function(h){return h.s});if(sEdit)hadir=hadir.concat(sExtra);if(!hadir.length){toast("Pilih status minimal satu atlet.");return}
+var old0=sEdit?db.sesi.filter(function(x){return x.id===sEdit})[0]:null,wasEdit=!!sEdit,sid=sEdit||uid(),rec={id:sid,pelatih:p,tgl:t,jm:$("jm").value,js:$("js").value,materi:$("materi").value.trim(),evaluasi:$("evaluasi").value.trim(),hadir:hadir,ts:(old0&&old0.ts)||Date.now()};
+if(!wasEdit){db.pelatih=p;save()}
 var btn=$("simpan"),job;btn.disabled=true;
-if(remote&&foto){job=remote.doc("foto/"+sid).set({data:foto}).then(function(){fotoCache[sid]=foto;rec.hasFoto=true;return put("sesi",rec)})}
-else{if(!remote)rec.foto=foto;job=put("sesi",rec)}
-job.then(function(){toast("Presensi tersimpan.");resetForm();tab("riwayat")},fail).then(function(){btn.disabled=false})};
+if(remote){
+var keep=wasEdit&&old0&&old0.hasFoto&&!fotoDel&&!fotoDirty;
+if(keep){rec.hasFoto=true;job=put("sesi",rec)}
+else if(foto){job=remote.doc("foto/"+sid).set({data:foto}).then(function(){fotoCache[sid]=foto;rec.hasFoto=true;return put("sesi",rec)})}
+else{job=put("sesi",rec);if(wasEdit&&old0&&old0.hasFoto)job=job.then(function(){return remote.doc("foto/"+sid).delete().catch(function(){})})}}
+else{rec.foto=foto;job=put("sesi",rec)}
+job.then(function(){toast(wasEdit?"Perubahan disimpan.":"Presensi tersimpan.");resetForm();tab("riwayat")},fail).then(function(){btn.disabled=false})};
 
 function hitung(s){var o={Hadir:0,Ijin:0,Sakit:0,Keterangan:0};s.hadir.forEach(function(h){o[h.s]++});return o}
 function rekap(s){
@@ -335,27 +342,31 @@ ST.map(function(k){return c[k]?'<span class="chip c-'+k+'">'+lbl(k)+' '+c[k]+'</
 (s.foto?'<img class="prev" src="'+s.foto+'" alt="Foto latihan '+esc(tglPanjang(s.tgl))+'">':(s.hasFoto?'<img class="prev" data-fid="'+s.id+'" alt="Foto latihan '+esc(tglPanjang(s.tgl))+'"'+(fotoCache[s.id]?' src="'+fotoCache[s.id]+'"':' hidden')+'>':''))+
 '<h3>Materi latihan</h3><p>'+(esc(s.materi)||'<span class="mt">Tidak diisi</span>')+'</p><h3>Evaluasi</h3><p>'+(esc(s.evaluasi)||'<span class="mt">Tidak diisi</span>')+'</p><h3>Kehadiran</h3><table>'+
 s.hadir.map(function(h){return '<tr><td>'+esc(h.nama)+(h.k?'<div class="mt">'+esc(h.k)+'</div>':'')+'</td><td class="c-'+h.s+'">'+lbl(h.s)+'</td></tr>'}).join("")+
-'</table><div class="bar" style="margin-top:14px"><button class="btn sm" data-copy="'+s.id+'" type="button">Salin rekap</button><button class="btn ghost sm" data-jpg="'+s.id+'" type="button">Simpan JPG</button><button class="btn bad sm" data-del="'+s.id+'" type="button">Hapus</button></div><textarea class="out" hidden readonly></textarea></div></details>'}).join("");el.querySelectorAll("details[open]").forEach(function(d){ensureFoto(d.dataset.id)})}
+'</table><div class="bar" style="margin-top:14px"><button class="btn sm" data-copy="'+s.id+'" type="button">Salin rekap</button><button class="btn ghost sm" data-edit="'+s.id+'" type="button">Edit</button><button class="btn ghost sm" data-jpg="'+s.id+'" type="button">Simpan JPG</button><button class="btn bad sm" data-del="'+s.id+'" type="button">Hapus</button></div><textarea class="out" hidden readonly></textarea></div></details>'}).join("");el.querySelectorAll("details[open]").forEach(function(d){ensureFoto(d.dataset.id)})}
 $("v-riwayat").addEventListener("toggle",function(e){if(e.target.open&&e.target.dataset.id)ensureFoto(e.target.dataset.id)},true);
 $("v-riwayat").addEventListener("click",function(e){
-var t=e.target,id=t.dataset.copy||t.dataset.del||t.dataset.jpg;if(!id)return;
+var t=e.target,id=t.dataset.copy||t.dataset.del||t.dataset.jpg||t.dataset.edit;if(!id)return;
 var s=db.sesi.filter(function(x){return x.id===id})[0];if(!s)return;
 if(t.dataset.jpg){exportJpg(s);return}
+if(t.dataset.edit){startEditSesi(s);return}
 if(t.dataset.del){if(t.dataset.sure!=="1"){t.dataset.sure="1";t.textContent="Yakin hapus?";return}
 rm("sesi",id).then(function(){toast("Sesi dihapus.")},fail);return}
 var txt=rekap(s),ta=t.closest(".det").querySelector("textarea");
 ta.value=txt;
 (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(txt):Promise.reject()).then(function(){toast("Rekap disalin.")},function(){ta.hidden=false;ta.select();toast("Salin teks di bawah secara manual.")})});
 
+function liNama(coll,x){
+if(ed&&ed.coll===coll&&ed.id===x.id)return '<li class="rn"><input type="text" value="'+esc(x.nama)+'" data-rnin="1" aria-label="Nama baru"><span class="bar"><button class="btn sm" data-rsave="'+coll+':'+x.id+'" type="button">Simpan</button><button class="btn ghost sm" data-rcancel="1" type="button">Batal</button></span></li>';
+return '<li><span>'+esc(x.nama)+'</span><span class="bar"><button class="btn ghost sm" data-ren="'+coll+':'+x.id+'" type="button">Ubah nama</button><button class="btn bad sm" '+(coll==="atlet"?'data-rm':'data-rp')+'="'+x.id+'" type="button">Hapus</button></span></li>'}
 function renderAtlet(){
-$("daftar").innerHTML=db.atlet.length?db.atlet.map(function(a){return '<li><span>'+esc(a.nama)+'</span><button class="btn bad sm" data-rm="'+a.id+'" type="button">Hapus</button></li>'}).join(""):'<li class="empty">Belum ada atlet.</li>'}
+$("daftar").innerHTML=db.atlet.length?db.atlet.map(function(a){return liNama("atlet",a)}).join(""):'<li class="empty">Belum ada atlet.</li>'}
 function tambah(){var n=$("nm").value.trim();if(!n)return;put("atlet",{id:uid(),nama:n,ts:Date.now()}).catch(fail);$("nm").value="";$("nm").focus()}
 $("tambah").onclick=tambah;
 $("nm").onkeydown=function(e){if(e.key==="Enter"){e.preventDefault();tambah()}};
 $("daftar").addEventListener("click",function(e){var id=e.target.dataset.rm;if(!id)return;delete cur[id];rm("atlet",id).catch(fail)});
 
 function renderPelatihSel(){var s=$("pelatih"),v=db.pelatih||"";s.innerHTML='<option value="">Pilih pelatih</option>'+db.pelatihList.map(function(p){return '<option value="'+esc(p.nama)+'">'+esc(p.nama)+'</option>'}).join("");s.value=v;if(s.value!==v)s.value=""}
-function renderPelatih(){$("daftarP").innerHTML=db.pelatihList.length?db.pelatihList.map(function(p){return '<li><span>'+esc(p.nama)+'</span><button class="btn bad sm" data-rp="'+p.id+'" type="button">Hapus</button></li>'}).join(""):'<li class="empty">Belum ada pelatih.</li>'}
+function renderPelatih(){$("daftarP").innerHTML=db.pelatihList.length?db.pelatihList.map(function(p){return liNama("pelatih",p)}).join(""):'<li class="empty">Belum ada pelatih.</li>'}
 function tambahP(){var n=$("np").value.trim();if(!n)return;put("pelatih",{id:uid(),nama:n,ts:Date.now()}).catch(fail);$("np").value="";$("np").focus()}
 $("tambahP").onclick=tambahP;
 $("np").onkeydown=function(e){if(e.key==="Enter"){e.preventDefault();tambahP()}};
@@ -527,6 +538,47 @@ $("lJudul").textContent="Edit lomba";$("lSimpan").textContent="Perbarui lomba";$
 var txt=lombaTeks(l),ta=t.closest(".det").querySelector("textarea");ta.value=txt;
 (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(txt):Promise.reject()).then(function(){toast("Hasil lomba disalin.")},function(){ta.hidden=false;ta.select();toast("Salin teks di bawah secara manual.")})});
 lReset();
+var sEdit=null,sExtra=[],fotoDirty=false,fotoDel=false,ed=null;
+function redrawLists(){renderAtlet();renderPelatih();var i=document.querySelector("li.rn input");if(i){i.focus();i.select()}}
+function listClick(e){var t=e.target;
+if(t.dataset.ren){var p=t.dataset.ren.split(":");ed={coll:p[0],id:p[1]};redrawLists();return}
+if(t.dataset.rcancel){ed=null;redrawLists();return}
+if(t.dataset.rsave){var q=t.dataset.rsave.split(":");doRename(q[0],q[1],t.closest("li").querySelector("input").value)}}
+function listKey(e){if(e.target.dataset.rnin==null)return;if(e.key==="Enter"){e.preventDefault();e.target.closest("li").querySelector("[data-rsave]").click()}if(e.key==="Escape"){ed=null;redrawLists()}}
+$("daftar").addEventListener("click",listClick);$("daftarP").addEventListener("click",listClick);
+$("daftar").addEventListener("keydown",listKey);$("daftarP").addEventListener("keydown",listKey);
+async function doRename(coll,id,val){
+var nn=(val||"").trim();if(!nn){toast("Nama tidak boleh kosong.");return}
+var arr=coll==="atlet"?db.atlet:db.pelatihList,it=arr.filter(function(x){return x.id===id})[0];if(!it)return;
+var old=it.nama;if(nn===old){ed=null;redrawLists();return}
+if(arr.some(function(x){return x.id!==id&&x.nama===nn})){toast("Nama itu sudah ada di daftar.");return}
+var ups=[];
+if(coll==="atlet"){
+db.sesi.forEach(function(s){if((s.hadir||[]).some(function(h){return h.nama===old})){var n=Object.assign({},s);n.hadir=s.hadir.map(function(h){return h.nama===old?Object.assign({},h,{nama:nn}):h});ups.push(["sesi",n])}});
+db.lomba.forEach(function(l){if((l.peserta||[]).some(function(x){return x.atlet===old})){var n=Object.assign({},l);n.peserta=l.peserta.map(function(x){return x.atlet===old?Object.assign({},x,{atlet:nn}):x});ups.push(["lomba",n])}})}
+else{db.sesi.forEach(function(s){if(s.pelatih===old)ups.push(["sesi",Object.assign({},s,{pelatih:nn})])})}
+try{
+await put(coll,Object.assign({},it,{nama:nn}));
+for(var i=0;i<ups.length;i+=6)await Promise.all(ups.slice(i,i+6).map(function(u){return put(u[0],u[1])}));
+if(coll==="pelatih"&&db.pelatih===old){db.pelatih=nn;save()}
+if(coll==="atlet")lPes.forEach(function(r){if(r.atlet===old)r.atlet=nn});
+ed=null;redrawLists();renderPelatihSel();
+toast("Nama diubah"+(ups.length?". "+ups.length+" catatan ikut diperbarui.":"."))}
+catch(e){fail(e)}}
+$("fotoHapus").onclick=function(){foto="";fotoDel=true;fotoDirty=false;$("foto").value="";$("prev").hidden=true;this.hidden=true};
+$("eBatal").onclick=resetForm;
+function startEditSesi(s){
+sEdit=s.id;fotoDirty=false;fotoDel=false;foto=s.foto||"";
+var sel=$("pelatih");if(![].some.call(sel.options,function(o){return o.value===s.pelatih}))sel.add(new Option(s.pelatih,s.pelatih));sel.value=s.pelatih;
+$("tgl").value=s.tgl;$("hari").textContent=tglPanjang(s.tgl);$("jm").value=s.jm||"16:00";$("js").value=s.js||"18:00";$("materi").value=s.materi||"";$("evaluasi").value=s.evaluasi||"";
+cur={};db.atlet.forEach(function(a){var e=(s.hadir||[]).filter(function(h){return h.nama===a.nama})[0];cur[a.id]=e?{s:e.s,k:e.k||""}:{s:"",k:""}});
+sExtra=(s.hadir||[]).filter(function(h){return!db.atlet.some(function(a){return a.nama===h.nama})});
+$("foto").value="";
+if(foto){$("prev").src=foto;$("prev").hidden=false;$("fotoHapus").hidden=false}
+else{$("prev").hidden=true;$("fotoHapus").hidden=true;
+if(s.hasFoto)getFoto(s.id).then(function(u){if(u&&sEdit===s.id&&!fotoDirty&&!fotoDel){foto=u;$("prev").src=u;$("prev").hidden=false;$("fotoHapus").hidden=false}})}
+$("eBarT").textContent="Sedang mengedit sesi "+tglPanjang(s.tgl)+".";$("eBar").hidden=false;$("simpan").textContent="Simpan perubahan";
+tab("catat");window.scrollTo({top:0,behavior:"smooth"})}
 var rb=null;
 function bulanIni(){return today().slice(0,7)}
 function namaBulan(m){var p=m.split("-");return new Date(+p[0],+p[1]-1,1).toLocaleDateString("id-ID",{month:"long",year:"numeric"})}
